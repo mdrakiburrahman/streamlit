@@ -13,8 +13,7 @@ def client(url): return KustoClient(KustoConnectionStringBuilder.with_az_cli_aut
 
 def query(url, db):
     r = client(url).execute(db, ".show external tables operations query_acceleration statistics")
-    df = pd.DataFrame([[row[i] for i in range(len(r.primary_results[0].columns))] for row in r.primary_results[0]], 
-                      columns=[c.column_name for c in r.primary_results[0].columns])
+    df = pd.DataFrame([[row[i] for i in range(len(r.primary_results[0].columns))] for row in r.primary_results[0]], columns=[c.column_name for c in r.primary_results[0].columns])
     df['QueryTimestamp'] = datetime.now()
     return df
 

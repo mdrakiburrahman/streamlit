@@ -3,10 +3,10 @@ from datetime import datetime
 from azure.kusto.data import KustoClient, KustoConnectionStringBuilder
 
 args = dict(zip(sys.argv[1::2], sys.argv[2::2]))
-clusters = [c.rsplit(':', 1) for c in args['--clusters'].split(',')]
+clusters = [c.rsplit(':', 2) if c.count(':') >= 3 else c.rsplit(':', 1) + [c.split('//')[1].split('.')[0]] for c in args['--clusters'].split(',')]
 poll = int(args.get('--poll', 30))
 
-st.title("🚀 Multi-Cluster Kusto Monitor")
+st.title("Query Acceleration Policy Lag Monitor")
 
 @st.cache_resource
 def client(url): return KustoClient(KustoConnectionStringBuilder.with_az_cli_authentication(url))
@@ -18,20 +18,18 @@ def query(url, db):
     df['QueryTimestamp'] = datetime.now()
     return df
 
-for url, db in clusters:
-    k = url.split('//')[1].split('.')[0]
-    if k not in st.session_state: st.session_state[k] = pd.DataFrame()
-    st.subheader(f"{k.upper()} - {db}")
-    globals()[k] = st.empty()
+for url, db, name in clusters:
+    if name not in st.session_state: st.session_state[name] = pd.DataFrame()
+    st.subheader(f"{name.upper()} - {db}")
+    globals()[name] = st.empty()
 
 while True:
-    for url, db in clusters:
-        k = url.split('//')[1].split('.')[0]
+    for url, db, name in clusters:
         try:
-            st.session_state[k] = pd.concat([st.session_state[k], query(url, db)]).tail(1600)
-            if not st.session_state[k].empty:
-                d = st.session_state[k].copy()
+            st.session_state[name] = pd.concat([st.session_state[name], query(url, db)]).tail(1600)
+            if not st.session_state[name].empty:
+                d = st.session_state[name].copy()
                 d['AccelerationPendingDataFilesCount'] = d['AccelerationPendingDataFilesCount'].astype(int)
-                globals()[k].plotly_chart(px.line(d, x='QueryTimestamp', y='AccelerationPendingDataFilesCount', color='ExternalTableName'))
-        except Exception as e: globals()[k].error(f"❌ {k}: {e}")
+                globals()[name].plotly_chart(px.line(d, x='QueryTimestamp', y='AccelerationPendingDataFilesCount', color='ExternalTableName'))
+        except Exception as e: globals()[name].error(f"❌ {name}: {e}")
     time.sleep(poll)
